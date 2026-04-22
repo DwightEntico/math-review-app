@@ -17,6 +17,7 @@ import {
   FieldSeparator,
 } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
+import { toast } from "sonner"
 
 // ✅ Zod Schema
 const signupSchema = z.object({
@@ -55,7 +56,8 @@ export function SignupForm({
     })
 
     if (error) {
-      alert(error.message)
+      toast.error(error.message)
+      // alert(error.message)
       setLoading(false)
       return
     }
@@ -66,8 +68,8 @@ export function SignupForm({
         role: 'student',
       })
     }
-
-    alert('Check your email for confirmation!')
+    toast.success('Account created! Please check your email for confirmation.')
+    // alert('Check your email for confirmation!')
     setLoading(false)
   }
 

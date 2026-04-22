@@ -18,6 +18,7 @@ import {
     FieldSeparator,
 } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
+import { toast } from 'sonner'
 
 // ✅ Zod schema
 const loginSchema = z.object({
@@ -55,16 +56,69 @@ export function LoginForm({
         if (error) {
             // 🔥 handle email not verified nicely
             if (error.message.toLowerCase().includes('email not confirmed')) {
-                alert('Please verify your email before logging in.')
+
+                toast.error('Please verify your email before logging in.')
             } else {
-                alert(error.message)
+                toast.error(error.message)
             }
             setLoading(false)
             return
         }
+        // ✅ get user
+        const {
+            data: { user },
+        } = await supabase.auth.getUser()
 
+        if (!user) {
+            toast.error("Something went wrong. Please try again.")
+            setLoading(false)
+            return
+        }
+
+        // ✅ get profile
+        const { data: profileCheck, error: profileErrorCheck } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', user.id)
+            .maybeSingle()
+
+        if (!profileCheck) {
+            await supabase.from('profiles').insert({
+                id: user.id,
+                role: 'student',
+            })
+        }
+
+        const { data: profile, error: profileError } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', user.id)
+            .maybeSingle()
+
+
+        if (profileError) {
+            toast.error("Failed to load profile.")
+            setLoading(false)
+            return
+        }
+
+        // 🔥 CASE 1: no profile → onboarding
+        if (!profile) {
+            router.push('/onboarding')
+            return
+        }
+
+        if (profile.role === 'student') {
+            router.push('/student/dashboard')
+        } else if (profile.role === 'teacher') {
+            router.push('/teacher/dashboard')
+        } else if (profile.role === 'admin') {
+            router.push('/admin/dashboard')
+        }
+        // 🔥 CASE 2: profile exists → redirect by role (basic for now)
+        // router.push('/dashboard')
         // ✅ temporary redirect (we’ll improve this later)
-        router.push('/dashboard')
+        // router.push('/dashboard')
     }
 
     return (
