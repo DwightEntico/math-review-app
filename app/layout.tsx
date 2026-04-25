@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 import { TooltipProvider } from "@/components/ui/tooltip"
 const montserratHeading = Montserrat({ subsets: ['latin'], variable: '--font-heading' });
 
-const roboto = Roboto({ subsets: ['latin'], variable: '--font-sans' })
+const geist = Geist({subsets:['latin'],variable:'--font-sans'})
 
 const fontMono = Geist_Mono({
   subsets: ["latin"],
@@ -22,7 +22,7 @@ export default function RootLayout({
     <html
       lang="en"
       suppressHydrationWarning
-      className={cn("antialiased", fontMono.variable, "font-sans", roboto.variable, montserratHeading.variable)}
+      className={cn("antialiased", fontMono.variable, "font-sans", geist.variable, montserratHeading.variable)}
     >
       <body>
         {/* <ThemeProvider> */}

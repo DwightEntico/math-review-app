@@ -1,7 +1,7 @@
-// components/nav-main.tsx
 "use client"
 
 import { ChevronRight, type LucideIcon } from "lucide-react"
+
 import {
   Collapsible,
   CollapsibleContent,
@@ -18,7 +18,20 @@ import {
   SidebarMenuSubItem,
 } from "@/components/ui/sidebar"
 
-export function NavMain({ items }: { items: any[] }) {
+export function NavMain({
+  items,
+}: {
+  items: {
+    title: string
+    url: string
+    icon?: LucideIcon
+    isActive?: boolean
+    items?: {
+      title: string
+      url: string
+    }[]
+  }[]
+}) {
   return (
     <SidebarGroup>
       <SidebarGroupLabel>Platform</SidebarGroupLabel>
@@ -38,12 +51,9 @@ export function NavMain({ items }: { items: any[] }) {
                   <ChevronRight className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
                 </SidebarMenuButton>
               </CollapsibleTrigger>
-
-              {/* VITAL FIX: Add your custom animation classes here */}
-              <CollapsibleContent className="overflow-hidden transition-all data-[state=open]:animate-collapse-down data-[state=closed]:animate-collapse-up">
-                <SidebarMenuSub className="py-2">
-
-                  {item.items?.map((subItem: any) => (
+              <CollapsibleContent className="overflow-hidden data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down">
+                <SidebarMenuSub>
+                  {item.items?.map((subItem) => (
                     <SidebarMenuSubItem key={subItem.title}>
                       <SidebarMenuSubButton asChild>
                         <a href={subItem.url}>

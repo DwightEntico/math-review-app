@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { toast } from 'sonner'
+import Cookies from 'js-cookie'
 
 // ✅ Zod schema
 const loginSchema = z.object({
@@ -48,77 +49,62 @@ export function LoginForm({
     const onSubmit = async (values: LoginFormValues) => {
         setLoading(true)
 
-        const { error } = await supabase.auth.signInWithPassword({
-            email: values.email,
-            password: values.password,
-        })
-
-        if (error) {
-            // 🔥 handle email not verified nicely
-            if (error.message.toLowerCase().includes('email not confirmed')) {
-
-                toast.error('Please verify your email before logging in.')
-            } else {
-                toast.error(error.message)
-            }
-            setLoading(false)
-            return
-        }
-        // ✅ get user
-        const {
-            data: { user },
-        } = await supabase.auth.getUser()
-
-        if (!user) {
-            toast.error("Something went wrong. Please try again.")
-            setLoading(false)
-            return
-        }
-
-        // ✅ get profile
-        const { data: profileCheck, error: profileErrorCheck } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', user.id)
-            .maybeSingle()
-
-        if (!profileCheck) {
-            await supabase.from('profiles').insert({
-                id: user.id,
-                role: 'student',
+        try {
+            // 1. Sign In
+            const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+                email: values.email,
+                password: values.password,
             })
-        }
 
-        const { data: profile, error: profileError } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', user.id)
-            .maybeSingle()
+            if (authError) throw authError
+            const user = authData.user
+            if (!user) return
 
+            // 2. Sync Profile
+            // We use upsert so if they exist, nothing breaks. If they don't, they get created.
+            const { data: profile, error: profileError } = await supabase
+                .from('profiles')
+                .upsert({
+                    id: user.id,
+                    // We only set 'student' if it's a brand new record (ignore if exists)
+                    // Note: Better handled via DB Trigger, but this is safe:
+                }, { onConflict: 'id' })
+                .select()
+                .single()
 
-        if (profileError) {
-            toast.error("Failed to load profile.")
+            if (profileError) throw new Error("Could not sync user profile.")
+
+            // 🚀 STEP 4: SET THE ONBOARDING COOKIE
+            // This allows the Middleware to check the status without a DB call
+            const isComplete = Boolean(profile.last_name && profile.first_name)
+
+            Cookies.set('onboarding_status', isComplete ? 'complete' : 'incomplete', {
+                expires: 7, // 7 days
+                secure: true,
+                sameSite: 'strict'
+            })
+
+            // 3. Unified Redirect Logic
+            const role = profile.role || 'student'
+            if (!isComplete) {
+                toast.info("Almost there! Please complete your profile.")
+                router.push(`/${role}/settings/profile`)
+            } else {
+                router.push(`/${role}/dashboard`)
+            }
+            // if (!profile.last_name) {
+            //     toast.info("Almost there! Please complete your profile.")
+            //     router.push(`/${role}/settings/profile`)
+            // } else {
+            //     router.push(`/${role}/dashboard`)
+            // }
+
+        } catch (error: any) {
+            const isUnconfirmed = error.message?.toLowerCase().includes('email not confirmed')
+            toast.error(isUnconfirmed ? 'Please verify your email.' : error.message)
+        } finally {
             setLoading(false)
-            return
         }
-
-        // 🔥 CASE 1: no profile → onboarding
-        if (!profile) {
-            router.push('/onboarding')
-            return
-        }
-
-        if (profile.role === 'student') {
-            router.push('/student/dashboard')
-        } else if (profile.role === 'teacher') {
-            router.push('/teacher/dashboard')
-        } else if (profile.role === 'admin') {
-            router.push('/admin/dashboard')
-        }
-        // 🔥 CASE 2: profile exists → redirect by role (basic for now)
-        // router.push('/dashboard')
-        // ✅ temporary redirect (we’ll improve this later)
-        // router.push('/dashboard')
     }
 
     return (

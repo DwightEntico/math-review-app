@@ -12,6 +12,7 @@ import {
   PieChart,
   Settings2,
   SquareTerminal,
+  User,
 } from "lucide-react"
 
 import { NavMain } from "../components/nav-main"
@@ -25,6 +26,7 @@ import {
   SidebarHeader,
   SidebarRail,
 } from "@/components/ui/sidebar"
+import { motion, AnimatePresence } from "framer-motion"
 
 // This is sample data.
 const data = {
@@ -36,7 +38,7 @@ const data = {
   teams: [
     {
       name: "Acme Inc",
-      logo: GalleryVerticalEnd,
+      logo: User,
       plan: "Enterprise",
     },
     {
@@ -52,14 +54,14 @@ const data = {
   ],
   navMain: [
     {
-      title: "Playground",
+      title: "General",
       url: "#",
       icon: SquareTerminal,
       isActive: true,
       items: [
         {
-          title: "History",
-          url: "#",
+          title: "Dashboard",
+          url: "/student/dashboard",
         },
         {
           title: "Starred",
@@ -72,16 +74,16 @@ const data = {
       ],
     },
     {
-      title: "Models",
+      title: "Topics",
       url: "#",
       icon: Bot,
       items: [
         {
-          title: "Genesis",
+          title: "Topics",
           url: "#",
         },
         {
-          title: "Explorer",
+          title: "Sub-topics",
           url: "#",
         },
         {
@@ -96,11 +98,11 @@ const data = {
       icon: BookOpen,
       items: [
         {
-          title: "Introduction",
+          title: "Resources",
           url: "#",
         },
         {
-          title: "Get Started",
+          title: "Reports",
           url: "#",
         },
         {
@@ -119,11 +121,11 @@ const data = {
       icon: Settings2,
       items: [
         {
-          title: "General",
+          title: "User Accounts",
           url: "#",
         },
         {
-          title: "Team",
+          title: "Classes/ Sections",
           url: "#",
         },
         {
@@ -158,18 +160,27 @@ const data = {
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   return (
-    <Sidebar collapsible="icon" {...props}>
+    <Sidebar
+      collapsible="icon"
+      className="transition-all duration-300 ease-in-out" // Smooth width transition
+      {...props}
+    >
       <SidebarHeader>
         <TeamSwitcher teams={data.teams} />
       </SidebarHeader>
-      <SidebarContent>
+
+      <SidebarContent className="overflow-x-hidden">
+        {/* We wrap NavMain and NavProjects to ensure they handle their internal states */}
         <NavMain items={data.navMain} />
-        <NavProjects projects={data.projects} />
+        {/* <NavProjects projects={data.projects} /> */}
       </SidebarContent>
+
       <SidebarFooter>
         <NavUser user={data.user} />
       </SidebarFooter>
-      <SidebarRail />
+
+      {/* The Rail often needs a hover effect to feel "active" */}
+      <SidebarRail className="hover:after:bg-primary transition-colors" />
     </Sidebar>
   )
 }

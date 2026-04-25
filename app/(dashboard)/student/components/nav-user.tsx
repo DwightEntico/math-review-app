@@ -30,12 +30,6 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar"
 
-import { createClient } from "@/lib/supabase/client"
-import { useRouter } from "next/navigation"
-import { toast } from "sonner"
-import Cookies from "js-cookie"
-
-
 export function NavUser({
   user,
 }: {
@@ -46,7 +40,6 @@ export function NavUser({
   }
 }) {
   const { isMobile } = useSidebar()
-  const { handleLogout } = useLogout()
 
   return (
     <SidebarMenu>
@@ -59,9 +52,7 @@ export function NavUser({
             >
               <Avatar className="h-8 w-8 rounded-lg">
                 <AvatarImage src={user.avatar} alt={user.name} />
-                <AvatarFallback className="rounded-lg">
-                  {user.name.substring(0, 2).toUpperCase()}
-                </AvatarFallback>
+                <AvatarFallback className="rounded-lg">CN</AvatarFallback>
               </Avatar>
               <div className="grid flex-1 text-left text-sm leading-tight">
                 <span className="truncate font-medium">{user.name}</span>
@@ -94,24 +85,25 @@ export function NavUser({
                 <Sparkles />
                 Upgrade to Pro
               </DropdownMenuItem>
-            </DropdownMenuGroup>
+              </DropdownMenuGroup>
             <DropdownMenuSeparator />
+               */}
             <DropdownMenuGroup>
               <DropdownMenuItem>
                 <BadgeCheck />
-                Account
+                Account Profile
               </DropdownMenuItem>
-              <DropdownMenuItem>
+              {/* <DropdownMenuItem>
                 <CreditCard />
                 Billing
-              </DropdownMenuItem>
+              </DropdownMenuItem> 
               <DropdownMenuItem>
                 <Bell />
                 Notifications
-              </DropdownMenuItem>
-            </DropdownMenuGroup> */}
+              </DropdownMenuItem> */}
+            </DropdownMenuGroup>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={handleLogout} className="cursor-pointer text-red-600">
+            <DropdownMenuItem>
               <LogOut />
               Log out
             </DropdownMenuItem>
@@ -120,33 +112,4 @@ export function NavUser({
       </SidebarMenuItem>
     </SidebarMenu>
   )
-}
-
-export function useLogout() {
-  const supabase = createClient()
-  const router = useRouter()
-
-  const handleLogout = async () => {
-    try {
-      // 1. Tell Supabase to invalidate the session
-      const { error } = await supabase.auth.signOut()
-      if (error) throw error
-
-      // 2. Manually clear your onboarding cookie 
-      // (This ensures the middleware doesn't get confused if a new user logs in)
-      Cookies.remove('onboarding_status')
-
-      toast.success("Logged out successfully")
-
-      // 3. Hard redirect to login
-      // Using window.location.href is "safer" for logout to clear all memory state
-      window.location.href = "/auth/login"
-
-    } catch (error: any) {
-      toast.error("Error logging out")
-      console.error(error.message)
-    }
-  }
-
-  return { handleLogout }
 }
