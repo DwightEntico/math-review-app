@@ -9,6 +9,9 @@ import React, { useEffect, useState } from "react"
 import { toast } from "sonner"
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import ProfileForm from "@/components/profile-form"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { timeAgo } from "@/lib/utils/date-formatter"
+
 // Define the shape of your data
 type User = {
   id: string
@@ -60,6 +63,29 @@ export default function StudentsPage() {
   // 1. Define Columns
   const columns: ColumnDef<User>[] = [
     {
+      id: "actions",
+      header: "Actions",
+      cell: ({ row }) => (
+        <TooltipProvider>
+          <Tooltip delayDuration={200}>
+            <TooltipTrigger asChild>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => handleEdit(row.original)}
+                className="h-8 w-8 hover:bg-primary hover:text-primary-foreground transition-colors"
+              >
+                <Edit className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="left">
+              <p>Edit Student Details</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      ),
+    },
+    {
       accessorKey: "first_name",
       header: ({ column }) => (
         <Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}>
@@ -70,22 +96,71 @@ export default function StudentsPage() {
     { accessorKey: "middle_name", header: "Middle Name" },
     { accessorKey: "last_name", header: "Last Name" },
     { accessorKey: "suffix", header: "Suffix" },
-    { accessorKey: "sex", header: "Sex" },
-    { accessorKey: "contact_details", header: "Contact Details" },
-    { accessorKey: "birthdate", header: "Birth Date" },
-
-    // { accessorKey: "email", header: "Email" },
-    // { accessorKey: "role", header: "Role" },
-
-
     {
-      id: "actions",
+      accessorKey: "sex",
+      header: "Sex",
       cell: ({ row }) => (
-        <Button variant="ghost" size="sm" onClick={() => handleEdit(row.original)}>
-          <Edit className="h-4 w-4 mr-2" /> Edit
-        </Button>
+        <span className="capitalize">
+          {row.getValue("sex")?.toString().replace(/_/g, ' ')}
+        </span>
       ),
     },
+    
+    {
+      accessorKey: "birthdate",
+      header: "Birth Date",
+      cell: ({ row }) => {
+        const dateStr = row.getValue("birthdate") as string;
+
+        if (!dateStr) return <span className="text-muted-foreground italic">N/A</span>;
+
+        // We use 'UTC' to prevent the common "off-by-one-day" timezone bug
+        const date = new Date(dateStr);
+
+        return new Intl.DateTimeFormat("en-US", {
+          month: "long",
+          day: "2-digit",
+          year: "numeric",
+        }).format(date);
+      },
+    },
+    { accessorKey: "contact_details", header: "Contact Details" },
+    { accessorKey: "email", header: "Email" },
+    {
+      accessorKey: "created_at",
+      header: "Date Registered",
+      cell: ({ row }) => {
+        const date = new Date(row.getValue("created_at"));
+
+        // Format for the Tooltip: "Sunday, April 26, 2026"
+        const fullDate = new Intl.DateTimeFormat("en-US", {
+          weekday: "long",
+          month: "long",
+          day: "2-digit",
+          year: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: true, // Uses AM/PM format
+        }).format(date);
+
+        return (
+          <TooltipProvider>
+            <Tooltip delayDuration={300}>
+              <TooltipTrigger asChild>
+                <span className="cursor-help border-b border-dotted border-muted-foreground/50 pb-0.5 text-sm">
+                  {timeAgo(date)}
+                </span>
+              </TooltipTrigger>
+              <TooltipContent side="top">
+                <p>{fullDate}</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        );
+      },
+    },
+
+
   ]
 
   // 2. Sample Data (In real app, fetch from Supabase here)
@@ -112,7 +187,7 @@ export default function StudentsPage() {
       {/* The Responsive Edit Drawer */}
       <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
         <SheetContent className="sm:max-w-xl overflow-y-auto">
-          <SheetHeader className="mb-6">
+          <SheetHeader>
             <SheetTitle>Edit Student Profile</SheetTitle>
             <SheetDescription>
               Modify the student&apos;s identity details. Click save when you&apos;re done.

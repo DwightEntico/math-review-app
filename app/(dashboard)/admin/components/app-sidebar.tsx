@@ -37,12 +37,12 @@ const data = {
   },
   teams: [
     {
-      name: "Acme Inc",
+      name: "IGCSE Maths",
       logo: User,
       plan: "Enterprise",
     },
     {
-      name: "Acme Corp.",
+      name: "IGCSE Maths",
       logo: AudioWaveform,
       plan: "Startup",
     },

@@ -1,6 +1,8 @@
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar"
 import { AppSidebar } from "@/components/student-sidebar" // This is your actual Sidebar content component
-
+export const metadata = {
+  title: "Students",
+};
 export default function StudentLayout({
   children,
 }: {

@@ -1,6 +1,8 @@
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar"
 import { TeacherSidebar } from "@/components/teacher-sidebar" // Create this component
-
+export const metadata = {
+  title: "Teachers",
+};
 export default function TeacherLayout({ children }: { children: React.ReactNode }) {
   return (
     <SidebarProvider>

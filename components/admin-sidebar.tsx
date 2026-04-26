@@ -45,7 +45,7 @@ const data = {
       plan: "v1.0.0",
     },
     {
-      name: "Acme Corp.",
+      name: "IGCSE Maths",
       logo: AudioWaveform,
       plan: "Startup",
     },
@@ -81,16 +81,28 @@ const data = {
       url: "/admin/curriculum",
       icon: BookOpen,
       items: [
-        { title: "Topics & Sub-topics", url: "/admin/curriculum/topics" },
-        { title: "Paper Mapping", url: "/admin/curriculum/papers" },
-        { title: "AI Prompt Settings", url: "/admin/curriculum/ai-config" },
+        {
+          title: "Global Topic Bank",
+          url: "/admin/curriculum/topics",
+          description: "Manage the master list of all IGCSE math topics"
+        },
+        {
+          title: "Paper Mapping",
+          url: "/admin/curriculum/mapping",
+          description: "Assign topics to Core/Extended Papers"
+        },
+        {
+          title: "AI Logic Config",
+          url: "/admin/curriculum/ai-config",
+          description: "Manage specific AI model types and prompts"
+        },
       ],
     },
     {
       title: "User Management",
       url: "/admin/users",
       icon: Users,
-      items: [        
+      items: [
         { title: "Teachers", url: "/admin/users/teachers" },
         { title: "Students", url: "/admin/users/students" },
         { title: "Verification Queue", url: "/admin/users/verify" },

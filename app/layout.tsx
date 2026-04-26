@@ -4,9 +4,14 @@ import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
 import { cn } from "@/lib/utils";
 import { TooltipProvider } from "@/components/ui/tooltip"
+import type { Metadata } from "next";
+export const metadata: Metadata = {
+  title: "IGCSE Math Portal",
+  description: "Advanced learning platform for IGCSE Mathematics",
+};
 const montserratHeading = Montserrat({ subsets: ['latin'], variable: '--font-heading' });
 
-const geist = Geist({subsets:['latin'],variable:'--font-sans'})
+const geist = Geist({ subsets: ['latin'], variable: '--font-sans' })
 
 const fontMono = Geist_Mono({
   subsets: ["latin"],

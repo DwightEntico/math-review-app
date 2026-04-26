@@ -26,7 +26,8 @@ const profileSchema = z.object({
   sex: z.enum(["male", "female", "other", "prefer_not_to_say"]),
   contact_details: z.string().min(10, "Please enter a valid phone number"),
   birthdate: z.string().min(1, "Birthdate is required"),
-  role: z.enum(["student", "teacher", "admin"]).optional() // Optional role field for admin use
+  role: z.enum(["student", "teacher", "admin"]).optional(), // Optional role field for admin use
+  email: z.string().optional(),
 })
 
 type ProfileFormValues = z.infer<typeof profileSchema>
@@ -51,6 +52,7 @@ export default function ProfileForm({ initialData, onSuccess, isReadOnly = false
       contact_details: "",
       birthdate: "",
       role: "student",
+      email: "",
     },
   })
 
@@ -70,43 +72,70 @@ export default function ProfileForm({ initialData, onSuccess, isReadOnly = false
   }, [initialData, reset])
 
   const onSubmit = async (values: ProfileFormValues) => {
-    try {
-      // 1. Determine Target ID 
-      // If initialData exists, we use its ID (Admin mode). Otherwise, get current user (Setup mode).
-      let targetId = initialData?.id
+    // 🪵 Debug: Track what the user actually clicked 'Submit' with
+    console.log("📝 Form Submission Initiated:", values)
 
+    try {
+      let targetId = initialData?.id
+      const { email, ...profileData } = values
       if (!targetId) {
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) throw new Error("Session expired.")
+        console.log("🔍 No initialData.id found, fetching current user session...")
+        const { data: { user }, error: authError } = await supabase.auth.getUser()
+
+        if (authError || !user) {
+          console.error("❌ Auth Error:", authError)
+          throw new Error("Session expired.")
+        }
+
         targetId = user.id
+        console.log("✅ Authenticated User ID found:", targetId)
+      } else {
+        console.log("🛠️ Edit Mode: Using targetId from initialData:", targetId)
       }
 
+      // 🏗️ Prepare the payload
+      const payload = {
+        id: targetId,
+        ...profileData,
+        updated_at: new Date().toISOString(),
+      }
+
+      console.log("🚀 Sending Upsert to Supabase:", payload)
+
       // 2. Perform Upsert
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('profiles')
-        .upsert({
-          id: targetId,
-          ...values,
-          updated_at: new Date().toISOString(),
-        })
+        .upsert(payload)
+        .select() // Select allows us to see the returned record in the log
 
-      if (error) throw error
+      if (error) {
+        console.error("❌ Supabase Upsert Error:", error)
+        throw error
+      }
 
+      console.log("🎉 Successfully saved record:", data)
       toast.success("Profile saved successfully!")
 
       // 3. Logic Branching
       if (onSuccess) {
-        // If an onSuccess prop exists (Modal/Edit mode), run it
+        console.log("🔄 Running onSuccess callback...")
         onSuccess()
       } else if (!initialData) {
-        // If it's a fresh setup (no initialData), do the hard redirect
+        console.log("🧭 No initialData, performing redirect to dashboard...")
         window.location.href = "/student/dashboard"
       }
 
     } catch (error: any) {
+      // 🪵 Final Catch-all log
+      console.error("🚨 ProfileForm Submission Failed:", error)
       toast.error(error.message || "An error occurred.")
     }
   }
+
+  const onInvalid = (errors: any) => {
+    console.error("⚠️ Validation Errors Found:", errors);
+    toast.error("Please check the form for errors.");
+  };
 
   return (
     <div className="flex flex-col gap-6 mx-auto w-full px-3">
@@ -120,10 +149,10 @@ export default function ProfileForm({ initialData, onSuccess, isReadOnly = false
         </div>
       )}
 
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+      <form onSubmit={handleSubmit(onSubmit, onInvalid)} className="space-y-6">
         <fieldset className="border p-4 rounded-lg space-y-4" disabled={isSubmitting || isReadOnly}>
           <legend className="text-sm font-medium px-2 text-muted-foreground">Legal Name</legend>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-1 gap-4">
             <div className="space-y-2">
               <label className="text-xs font-semibold uppercase">First Name</label>
               <Input {...register("first_name")} placeholder="John" />
@@ -156,21 +185,21 @@ export default function ProfileForm({ initialData, onSuccess, isReadOnly = false
 
         <fieldset className="border p-4 rounded-lg" disabled={isSubmitting || isReadOnly}>
           <legend className="text-sm font-medium px-2 text-muted-foreground">Contact & Identity</legend>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-1 gap-6">
             <div className="space-y-2">
               <label className="text-xs font-semibold uppercase">Sex</label>
               <Select
                 onValueChange={(value) => setValue("sex", value as any)}
                 value={watch("sex")}
               >
-                <SelectTrigger>
+                <SelectTrigger className='w-full'>
                   <SelectValue placeholder="Select" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="male">Male</SelectItem>
                   <SelectItem value="female">Female</SelectItem>
-                  <SelectItem value="other">Other</SelectItem>
-                  <SelectItem value="prefer_not_to_say">N/A</SelectItem>
+                  {/* <SelectItem value="other">Other</SelectItem>
+                  <SelectItem value="prefer_not_to_say">N/A</SelectItem> */}
                 </SelectContent>
               </Select>
             </div>
@@ -180,6 +209,14 @@ export default function ProfileForm({ initialData, onSuccess, isReadOnly = false
               <Input {...register("contact_details")} placeholder="123-456-7890" />
               {errors.contact_details && <p className="text-xs text-red-500">{errors.contact_details.message}</p>}
             </div>
+            {initialData && (
+
+              <div className="space-y-2">
+                <label className="text-xs font-semibold uppercase">Email Address</label>
+                <Input {...register("email")} placeholder="john.doe@example.com" readOnly />
+                {errors.email && <p className="text-xs text-red-500">{errors.email.message}</p>}
+              </div>
+            )}
           </div>
         </fieldset>
         {/* Field Group: Account Settings (ONLY FOR EDITING) */}

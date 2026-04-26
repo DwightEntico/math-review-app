@@ -3,7 +3,9 @@ import { AdminSidebar } from "@/components/admin-sidebar" // Create this compone
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import { toast, Toaster } from "sonner"
-
+export const metadata = {
+  title: "Admin",
+};
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
