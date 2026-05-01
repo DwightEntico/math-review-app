@@ -203,7 +203,8 @@ export function AdminSidebar({ ...props }: React.ComponentProps<typeof Sidebar>)
   const userData = {
     name: loading ? "Loading..." : `${user?.first_name || "Student"} ${user?.last_name || ""}`,
     email: user?.email || "",
-    avatar: user?.avatar_url || "/avatars/default.jpg",
+    avatar: user?.avatar_url || "/logo.png", // Default to IGCSE logo if no avatar
+    // avatar: user?.avatar_url || "/avatars/default.jpg",
   }
   return (
     <Sidebar collapsible="icon" {...props}>

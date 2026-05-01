@@ -210,23 +210,27 @@ export default function PaperMappingPage() {
                         </div>
 
                         {paper.paper_topic_config?.length > 0 ? (
-                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                            {paper.paper_topic_config.map((config) => (
-                              <div
-                                key={config.topic_id}
-                                className="group flex items-center justify-between p-3 rounded-lg border bg-background hover:shadow-md hover:border-primary/30 transition-all"
-                              >
-                                <span className="text-sm font-semibold truncate">{config.math_topics.name}</span>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-muted"
+                          /* --- SCROLLABLE CONTAINER START --- */
+                          <div className="max-h-[320px] pb-[10px] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-muted-foreground/20 scrollbar-track-transparent">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                              {paper.paper_topic_config.map((config) => (
+                                <div
+                                  key={config.topic_id}
+                                  className="group flex items-center justify-between p-3 rounded-lg border bg-background hover:shadow-md hover:border-primary/30 transition-all"
                                 >
-                                  <Settings2 className="h-3.5 w-3.5 text-muted-foreground" />
-                                </Button>
-                              </div>
-                            ))}
+                                  <span className="text-sm font-semibold truncate">{config.math_topics.name}</span>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-muted"
+                                  >
+                                    <Settings2 className="h-3.5 w-3.5 text-muted-foreground" />
+                                  </Button>
+                                </div>
+                              ))}
+                            </div>
                           </div>
+                          /* --- SCROLLABLE CONTAINER END --- */
                         ) : (
                           <div className="flex flex-col items-center justify-center py-10 border-2 border-dotted rounded-lg bg-background/50">
                             <p className="text-sm text-muted-foreground italic mb-3">No topics mapped to this paper yet.</p>

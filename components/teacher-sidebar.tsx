@@ -25,15 +25,15 @@ import {
   SidebarHeader,
   SidebarRail,
 } from "@/components/ui/sidebar"
-
+import { useUser } from "@/hooks/use-user" // Import your new hook
 const data = {
   user: {
-    name: "Teacher Name", // Map this to your Supabase Auth user later
+    name: "Teacher Name",
     email: "teacher@school.com",
     avatar: "/avatars/teacher.jpg",
   },
   teams: [
-    { name: "School Academy", logo: GalleryVerticalEnd, plan: "Pro" },
+    { name: "IGCSE MATH", logo: GalleryVerticalEnd, plan: "Teacher" },
   ],
   navMain: [
     {
@@ -43,26 +43,46 @@ const data = {
       isActive: true,
       items: [
         { title: "My Classes", url: "/teacher/classes" },
-        { title: "Assignments", url: "/teacher/assignments" },
+        { title: "Student Progress", url: "/teacher/analytics" },
       ],
     },
     {
-      title: "Resources",
+      title: "Test Bank", // NEW: Aligned with your database tables
       url: "#",
       icon: BookOpen,
       items: [
-        { title: "Lesson Plans", url: "/teacher/lessons" },
-        { title: "Library", url: "/teacher/library" },
+        { title: "Create New Test", url: "/teacher/tests/new" },
+        { title: "Browse Questions", url: "/teacher/bank" },
+
+        { title: "Create Question", url: "/teacher/bank/new" }, // Logic for the Schema we built
+        { title: "Manage Tests", url: "/teacher/tests" },
+      ],
+    },
+    {
+      title: "Syllabus Mapping", // For the topic mapping UI we did earlier
+      url: "#",
+      icon: Map,
+      items: [
+        { title: "Paper Config", url: "/teacher/config" },
+        { title: "Topic Hierarchy", url: "/teacher/topics" },
       ],
     },
   ],
-  projects: [
-    { name: "Math Dept", url: "#", icon: Frame },
-    { name: "Science Fair", url: "#", icon: PieChart },
-  ],
+  // projects: [
+  //   { name: "Department Shared", url: "#", icon: Frame },
+  //   { name: "Past Paper Archive", url: "#", icon: PieChart },
+  // ],
 }
 
 export function TeacherSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+  const { user, loading } = useUser()
+  // Format the display data
+  const userData = {
+    name: loading ? "Loading..." : `${user?.first_name || "Student"} ${user?.last_name || ""}`,
+    email: user?.email || "",
+    avatar: user?.avatar_url || "/logo.png"
+    // avatar: user?.avatar_url || "/avatars/default.jpg",
+  }
   return (
     <Sidebar collapsible="icon" {...props}>
       <SidebarHeader>
@@ -75,13 +95,13 @@ export function TeacherSidebar({ ...props }: React.ComponentProps<typeof Sidebar
           Don't wrap NavMain in another Collapsible unless you want to hide the whole menu.
         */}
         <NavMain items={data.navMain} />
-        <NavProjects projects={data.projects} />
+        {/* <NavProjects projects={data.projects} /> */}
       </SidebarContent>
 
       <SidebarFooter>
-        <NavUser user={data.user} />
+        <NavUser user={userData} />
       </SidebarFooter>
-      
+
       <SidebarRail />
     </Sidebar>
   )
