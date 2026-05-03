@@ -1,5 +1,5 @@
 'use client'
-
+import { createClient } from '@/lib/supabase/client'
 import React from 'react'
 import { useFieldArray, useWatch } from "react-hook-form"
 import { Card } from "@/components/ui/card"
@@ -28,10 +28,10 @@ import {
     Image as ImageIcon,
     Type,
     Plus,
-    Check
+    Check,
+    X
 } from "lucide-react"
 import { cn } from '@/lib/utils'
-// import { watch } from 'fs'
 import { toast } from 'sonner'
 import ReactMarkdown from 'react-markdown'
 import remarkMath from 'remark-math'
@@ -103,21 +103,25 @@ export function QuestionCard({
     index,
     remove,
     setValue,
-    watch
+    watch,
+    id,
 }: any) {
     const basePath = `sections.${sectionIndex}.questions.${index}`
 
-    // Add these two watches at the top level
+    // 1. INITIALIZE CLIENTS
+    // Ensure createClient() is called properly (usually from your utils)
+    const supabase = React.useMemo(() => createClient(), []);
+
+    // 2. ALL HOOKS AT THE TOP LEVEL
+    // Do not call these inside functions or conditionals
     const questionText = useWatch({ control, name: `${basePath}.text` })
     const currentOptions = useWatch({ control, name: `${basePath}.options` }) || []
-
-    const questionErrors = errors?.sections?.[sectionIndex]?.questions?.[index]
-
-    // Watch values for conditional rendering
     const questionType = useWatch({ control, name: `${basePath}.type` })
     const contentType = useWatch({ control, name: `${basePath}.contentType` })
-
     const isCalculator = useWatch({ control, name: `${basePath}.isCalculator` })
+    const aiExplanation = useWatch({ control, name: `${basePath}.aiExplanation` });
+    const imageUrl = useWatch({ control, name: `${basePath}.imageUrl` });
+    const [activeId, setActiveId] = React.useState<string | null>(null);
     const [isGenerating, setIsGenerating] = React.useState(false);
 
     // Options Field Array
@@ -125,10 +129,23 @@ export function QuestionCard({
         control,
         name: `${basePath}.options`
     })
+
+    const questionErrors = errors?.sections?.[sectionIndex]?.questions?.[index]
+    const getMimeType = (url: string) => {
+        if (url.endsWith(".png")) return "image/png";
+        if (url.endsWith(".jpg") || url.endsWith(".jpeg")) return "image/jpeg";
+        if (url.endsWith(".webp")) return "image/webp";
+        return "image/png"; // Default
+    };
+    // 3. LOGIC FUNCTIONS
     const generateAIExplanation = async () => {
-        // No more calling watch() here, we use the variables from above
-        if (!questionText) {
-            toast.error("Please enter a question first");
+        // Only block if BOTH are missing
+        if (contentType === 'text' && !questionText) {
+            toast.error("Please enter the question text first");
+            return;
+        }
+        if (contentType === 'image' && !imageUrl) {
+            toast.error("Please upload an image first");
             return;
         }
 
@@ -139,16 +156,25 @@ export function QuestionCard({
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     text: questionText,
+                    imageUrl: contentType === 'image' ? imageUrl : null, // ✅ Pass the URL here
                     options: currentOptions.filter((o: any) => o.text),
                     type: questionType
                 }),
             });
+            if (response.status === 429) {
+                toast.error("The AI is a bit busy! Please wait 30 seconds and try again.");
+                return;
+            }
 
+            if (!response.ok) {
+                throw new Error("Something went wrong with the AI.");
+            }
             const data = await response.json();
             if (data.explanation) {
                 setValue(`${basePath}.aiExplanation`, data.explanation, { shouldDirty: true });
                 toast.success("Explanation generated!");
             }
+
         } catch (error) {
             toast.error("Failed to reach AI tutor");
         } finally {
@@ -156,13 +182,91 @@ export function QuestionCard({
         }
     };
 
-    // CALL HOOKS HERE (Top Level)
-    const aiExplanation = useWatch({
-        control,
-        name: `${basePath}.aiExplanation`
-    });
+    const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        const maxSize = 5 * 1024 * 1024; // 5MB
+        if (file.size > maxSize) {
+            toast.error("File is too large. Max 5MB allowed.");
+            return;
+        }
+
+        const loadingToast = toast.loading("Uploading image...");
+
+        try {
+            const fileExt = file.name.split('.').pop();
+            const fileName = `${crypto.randomUUID()}.${fileExt}`;
+            const filePath = `questions/${fileName}`;
+
+            const { data, error: uploadError } = await supabase.storage
+                .from('question-media')
+                .upload(filePath, file, {
+                    cacheControl: '3600',
+                    upsert: false
+                });
+
+            if (uploadError) throw uploadError;
+
+            const { data: { publicUrl } } = supabase.storage
+                .from('question-media')
+                .getPublicUrl(filePath);
+
+            setValue(`${basePath}.imageUrl`, publicUrl, {
+                shouldDirty: true,
+                shouldValidate: true
+            });
+
+            toast.success("Image uploaded successfully!", { id: loadingToast });
+        } catch (error: any) {
+            console.error("Upload error:", error);
+            toast.error(error.message || "Failed to upload image", { id: loadingToast });
+        }
+    };
+    const handleDeleteImage = async () => {
+        if (!imageUrl) return;
+
+        // Optional: Only show loading if you want, but a toast is usually enough
+        const loadingToast = toast.loading("Deleting image...");
+
+        try {
+            // Extract the file path from the full URL
+            // Example: .../storage/v1/object/public/question-media/questions/abc.png 
+            // We need: 'questions/abc.png'
+            const path = imageUrl.split('question-media/')[1];
+
+            if (path) {
+                const { error } = await supabase.storage
+                    .from('question-media')
+                    .remove([path]);
+
+                if (error) {
+                    console.error("Storage delete error:", error);
+                    // We continue anyway so the user can at least upload a new one
+                }
+            }
+
+            // 2. Clear the form state
+            setValue(`${basePath}.imageUrl`, "", {
+                shouldDirty: true,
+                shouldValidate: true
+            });
+
+            toast.success("Image removed", { id: loadingToast });
+        } catch (error) {
+            toast.error("Error removing file", { id: loadingToast });
+            // Fallback: clear the form anyway
+            setValue(`${basePath}.imageUrl`, "");
+        }
+    };
     return (
-        <Card className="relative group border-l-4 border-l-transparent hover:border-l-purple-500 transition-all shadow-sm bg-white overflow-hidden">
+        <Card
+            onClick={() => setActiveId(id)} // ✅ Set active when user clicks anywhere on card
+            className={cn(
+                "relative group border-l-4 transition-all shadow-sm bg-white overflow-hidden",
+                activeId === id ? "border-l-purple-500" : "border-l-transparent"
+            )}
+        >
             <div className="p-6 space-y-6">
 
                 {/* Header: Index & Tier Selector */}
@@ -187,12 +291,13 @@ export function QuestionCard({
                         </Select>
 
                         <Tabs value={contentType} onValueChange={(v) => setValue(`${basePath}.contentType`, v)}>
+                            {/* {contentType} */}
                             <TabsList className="h-8">
                                 <TabsTrigger value="text" className="text-[10px] uppercase font-bold px-3">
-                                    <Type className="h-3 w-3 mr-1" /> Text
+                                    <Type className="h-3 w-3 mr-1" />
                                 </TabsTrigger>
                                 <TabsTrigger value="image" className="text-[10px] uppercase font-bold px-3">
-                                    <ImageIcon className="h-3 w-3 mr-1" /> Image
+                                    <ImageIcon className="h-3 w-3 mr-1" />
                                 </TabsTrigger>
                             </TabsList>
                         </Tabs>
@@ -203,9 +308,69 @@ export function QuestionCard({
                 <Field>
                     <FieldLabel className="text-[10px] uppercase font-bold text-slate-500">Problem Description</FieldLabel>
                     {contentType === 'image' ? (
-                        <div className="border-2 border-dashed rounded-xl p-8 flex flex-col items-center bg-slate-50/30 hover:bg-slate-50 transition-colors">
-                            <ImageIcon className="h-8 w-8 text-slate-400 mb-2" />
-                            <Button type="button" variant="outline" size="sm" className="font-bold">Upload Image</Button>
+                        <div className="space-y-4 animate-in fade-in duration-300">
+                            {/* The Prompt (Context for the image) */}
+                            <div className="space-y-2">
+                                <FieldLabel className="text-[10px] uppercase font-bold text-slate-500 tracking-tight">
+                                    Question Instructions
+                                </FieldLabel>
+                                <Input
+                                    {...register(`${basePath}.text`)}
+                                    placeholder="e.g., 'Refer to the diagram below to calculate x...'"
+                                    className="text-sm border-slate-200 focus-visible:ring-purple-500 bg-white"
+                                />
+                            </div>
+
+                            {/* The Upload Area */}
+                            <div className="space-y-2">
+                                <FieldLabel className="text-[10px] uppercase font-bold text-slate-500 tracking-tight">
+                                    Visual Content
+                                </FieldLabel>
+                                <div className="relative group border-2 border-dashed border-slate-200 rounded-xl min-h-[200px] flex flex-col items-center justify-center bg-slate-50/30 hover:bg-purple-50/50 hover:border-purple-300 transition-all cursor-pointer overflow-hidden">
+
+                                    {/* ✅ FIX: Use the 'imageUrl' variable from your top-level hooks */}
+                                    {imageUrl ? (
+                                        <div className="relative w-full p-4 flex flex-col items-center">
+                                            <div className="relative max-w-full group/img">
+                                                <img
+                                                    src={imageUrl}
+                                                    className="rounded-lg object-contain max-h-[250px] shadow-sm bg-white"
+                                                    alt="Question diagram"
+                                                />
+                                                <Button
+                                                    type="button"
+                                                    size="icon"
+                                                    variant="destructive"
+                                                    className="absolute -top-2 -right-2 h-6 w-6 rounded-full shadow-lg opacity-0 group-hover/img:opacity-100 transition-opacity"
+                                                    onClick={handleDeleteImage} // ✅ Call the new function instead of inline setValue
+                                                >
+                                                    <Trash2 className="h-3 w-3" />
+                                                </Button>
+
+                                            </div>
+                                            <p className="text-[10px] text-slate-400 mt-3 font-medium italic">
+                                                Click 'Discard' in the AI section below to refresh logic if image changed
+                                            </p>
+                                        </div>
+                                    ) : (
+                                        <label className="w-full h-full p-8 flex flex-col items-center justify-center cursor-pointer">
+                                            <div className="p-3 bg-white rounded-full shadow-sm mb-3 group-hover:scale-110 transition-transform">
+                                                <ImageIcon className="h-6 w-6 text-purple-600" />
+                                            </div>
+                                            <p className="text-xs font-bold text-slate-600">Drag & Drop or Click to Upload</p>
+                                            <p className="text-[10px] text-slate-400 mt-1 uppercase tracking-tighter">
+                                                PNG, JPG, SVG up to 5MB
+                                            </p>
+                                            <input
+                                                type="file"
+                                                accept="image/*"
+                                                className="hidden"
+                                                onChange={handleImageUpload}
+                                            />
+                                        </label>
+                                    )}
+                                </div>
+                            </div>
                         </div>
                     ) : (
                         <Textarea
@@ -226,7 +391,20 @@ export function QuestionCard({
                 <div className="w-full md:w-[220px]">
                     <Select
                         defaultValue="multiple_choice"
-                        onValueChange={(v) => setValue(`${basePath}.type`, v)}
+                        onValueChange={(v) => {
+                            setValue(`${basePath}.type`, v);
+
+                            // If switching to short answer, clear option errors
+                            if (v === "short_answer") {
+                                setValue(`${basePath}.options`, []); // Clear choices
+                            } else {
+                                // If switching back to multiple choice, give them 2 empty options
+                                setValue(`${basePath}.options`, [
+                                    { id: crypto.randomUUID(), text: '', is_correct: false },
+                                    { id: crypto.randomUUID(), text: '', is_correct: false }
+                                ]);
+                            }
+                        }}
                     >
                         <SelectTrigger className="h-10 bg-white border-slate-200 shadow-sm font-medium">
                             <SelectValue placeholder="Select Question Type" />
@@ -291,6 +469,12 @@ export function QuestionCard({
                             <p className="text-[10px] text-muted-foreground mt-3 italic font-medium opacity-70">
                                 Exact match required for auto-grading.
                             </p>
+                            {/* Show the specific error for this field */}
+                            {errors?.sections?.[sectionIndex]?.questions?.[index]?.correctAnswerText && (
+                                <p className="text-red-500 text-[10px] font-bold">
+                                    {errors.sections[sectionIndex].questions[index].correctAnswerText.message}
+                                </p>
+                            )}
                         </div>
                     )}
                 </div>
@@ -397,3 +581,8 @@ export function QuestionCard({
         </Card>
     )
 }
+
+/**
+ * core or extended question
+ * choice - type: "short_answer"
+ */

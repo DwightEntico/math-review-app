@@ -1,6 +1,6 @@
 "use client"
 
-import React from 'react'
+import React, { useEffect, useState } from 'react'
 import { useForm, useFieldArray, FormProvider, SubmitHandler } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { createClient } from "@/lib/supabase/client"
@@ -20,9 +20,13 @@ import { cn } from '@/lib/utils'
 
 export function TestBuilderShell() {
     const supabase = createClient()
-
+    const [activeId, setActiveId] = useState<string | null>(null);
+    const [mounted, setMounted] = useState(false);
+    const [isDraftSaving, setIsDraftSaving] = useState(false);
+    const [savedTestId, setSavedTestId] = useState<string | null>(null);
     const form = useForm<TestValues>({
         resolver: zodResolver(TestSchema as any),
+        mode: "onChange",
         defaultValues: {
             title: "",
             description: "", // Added to match schema
@@ -49,7 +53,8 @@ export function TestBuilderShell() {
                         points: 1,
                         isCalculator: false,
                         aiExplanation: '',
-                        aiTutorPrompt: ''
+                        aiTutorPrompt: '',
+                        imageUrl: ''
                     }]
                 }
             ]
@@ -67,7 +72,10 @@ export function TestBuilderShell() {
     const watchedSections = watch("sections")
     const allQuestions = watchedSections.flatMap(s => s.questions || [])
     const totalPoints = allQuestions.reduce((acc, curr) => acc + (Number(curr.points) || 0), 0)
-
+    // This only runs once the component is in the browser
+    useEffect(() => {
+        setMounted(true);
+    }, []);
 
     // Add this useEffect to watch errors in real-time in the console
     React.useEffect(() => {
@@ -75,7 +83,85 @@ export function TestBuilderShell() {
             console.log("❌ Form Validation Errors:", errors);
         }
     }, [errors]);
-    const onSubmit: SubmitHandler<TestValues> = async (data) => {
+
+    const onFormError = (errors: any) => {
+        // 1. Check if there are errors in the sections
+        if (errors.sections) {
+            errors.sections.forEach((section: any, sIdx: number) => {
+                if (section?.questions) {
+                    section.questions.forEach((question: any, qIdx: number) => {
+                        if (question) {
+                            // 2. Identify the human-readable question number
+                            // (qIdx + 1 because arrays start at 0)
+                            toast.error(`Error in Question #${qIdx + 1}: Please check the required fields (Question, Choices, Correct answer or image format).`);
+
+                            // 3. Optional: Logging specific details for you during testing
+                            console.log(`Question ${qIdx + 1} Errors:`, question);
+                        }
+                    });
+                }
+            });
+        }
+
+        // 4. Handle global errors (like title or time limit)
+        if (errors.title) toast.error("Test Title is required");
+        if (errors.timeLimit) toast.error("Please set a valid time limit");
+    };
+
+
+    const handleDataSave = async (data: TestValues, status: 'draft' | 'published', setLoadingState: (loading: boolean) => void) => {
+        setLoadingState(true); // Start loading
+        const loadingToast = toast.loading(status === 'draft' ? "Saving draft..." : "Publishing test...");
+        // 1. Format the data (Transforming is_correct booleans to correctOptionIds array)
+        const formattedData = {
+            ...data,
+            id: savedTestId,
+            status, // Inject the status tag
+            sections: data.sections.map(section => ({
+                ...section,
+                questions: section.questions.map(q => {
+                    if (q.type === 'multiple_choice') {
+                        return {
+                            ...q,
+                            correctOptionIds: q.options
+                                ?.filter(opt => opt.is_correct)
+                                .map(opt => opt.id) || []
+                        }
+                    }
+                    return q;
+                })
+            }))
+        };
+
+        // const loadingToast = toast.loading(status === 'draft' ? "Saving draft..." : "Publishing test...");
+
+        try {
+            const response = await fetch('/api/tests/save', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(formattedData),
+            });
+
+            const result = await response.json();
+            if (!response.ok) throw new Error(result.error);
+            // ✅ IMPORTANT: Store the ID returned by Supabase
+            if (result.testId) {
+                setSavedTestId(result.testId);
+            }
+            toast.success(status === 'draft' ? "Draft saved successfully!" : "Test published!", { id: loadingToast });
+
+            // Optional: If published, you might want to redirect
+            // if (status === 'published') router.push('/teacher/dashboard');
+
+            return result;
+        } catch (error: any) {
+            toast.error(error.message || "Something went wrong", { id: loadingToast });
+        } finally {
+            setLoadingState(false); // ✅ Stop loading regardless of success/error
+        }
+    };
+
+    const onSubmit1: SubmitHandler<TestValues> = async (data) => {
         // Before sending to Supabase, we map the is_correct booleans to the ID array
         const formattedData = {
             ...data,
@@ -97,49 +183,42 @@ export function TestBuilderShell() {
         };
 
         console.log("Saving to Supabase:", formattedData);
+        const loadingToast = toast.loading("Saving your test...");
+
+        try {
+            const response = await fetch('/api/tests/save', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(formattedData),
+            });
+
+            const result = await response.json();
+
+            if (!response.ok) throw new Error(result.error);
+
+            toast.success("Test published successfully!", { id: loadingToast });
+
+            // Optional: Redirect to test list or preview page
+            // router.push(`/teacher/tests/${result.testId}`);
+
+        } catch (error: any) {
+            toast.error(error.message || "Something went wrong", { id: loadingToast });
+        }
         // await supabase.from('tests').insert(formattedData);
     };
-    // const onSubmit = async (data: TestValues) => {
-    //     // 1. Calculate the value right here
-    //     const calculatedTotalPoints = data.sections.reduce((acc, sec) => {
-    //         return acc + (sec.questions?.reduce((qAcc, q) => qAcc + (Number(q.points) || 0), 0) || 0);
-    //     }, 0);
-    //     // 1. Transform the data to pull is_correct flags into the correctOptionIds array
-    //     const finalPayload = {
-    //         ...data,
-    //         total_points: calculatedTotalPoints, // Now it's "stored" for the DB!
-    //         sections: data.sections.map(section => ({
-    //             ...section,
-    //             questions: section.questions.map(q => {
-    //                 if (q.type === 'multiple_choice' && q.options) {
-    //                     return {
-    //                         ...q,
-    //                         // Map the options to find which ones are marked correct
-    //                         correctOptionIds: q.options
-    //                             .filter(opt => opt.is_correct)
-    //                             .map(opt => opt.id)
-    //                     };
-    //                 }
-    //                 return q;
-    //             })
-    //         }))
-    //     };
-    //     console.log("✅ Validation Passed! Data:", data);
-    //     console.log("🚀 Final Payload for Database:", finalPayload);
-    //     console.log("Saving to DB with Total Points:", finalPayload.total_points);
-    //     // 2. Send finalPayload to Supabase
-    //     // await supabase.from('tests').insert([finalPayload])
-    // };
+    const onSubmit: SubmitHandler<TestValues> = async (data) => {
+        await handleDataSave(data, 'published', () => { });
+    };
     const handleSaveDraft = () => {
         const currentValues = form.getValues();
-        console.log("📝 Draft Data:", currentValues);
-        toast.info("Draft data logged to console");
+        if (!currentValues.title) return toast.error("Title required for draft");
+
+        handleDataSave(currentValues, 'draft', setIsDraftSaving);
     };
-
-
+    if (!mounted) return null;
     return (
         <FormProvider {...form}>
-            <form onSubmit={handleSubmit(onSubmit)} className="min-h-screen bg-slate-50/50 pb-20">
+            <form onSubmit={handleSubmit(onSubmit, onFormError)} className="min-h-screen bg-slate-50/50 pb-20">
                 {/* TOP STICKY BAR */}
                 <div className="sticky top-0 z-50 w-full bg-white border-b px-6 py-3 flex items-center justify-between shadow-sm">
                     <div className="flex items-center gap-4">
@@ -155,24 +234,24 @@ export function TestBuilderShell() {
                             {errors.title && <span className="text-[10px] text-red-500 font-bold">{errors.title.message}</span>}
                         </div>
                     </div>
+                    {/* TOP STICKY BAR */}
                     <div className="flex items-center gap-3">
-                        <Button type="button" variant="outline" className="hidden sm:flex" onClick={handleSaveDraft}>Save Draft</Button>
                         <Button
-                            type="submit"
-                            disabled={isSubmitting}
-                            className={cn(
-                                "gap-2 transition-all",
-                                !isValid && Object.keys(errors).length > 0
-                                    ? "bg-slate-400 cursor-not-allowed"
-                                    : "bg-purple-700 hover:bg-purple-800"
-                            )}
+                            type="button" // Important: type="button" avoids triggering Zod validation
+                            variant="outline"
+                            onClick={handleSaveDraft}
+                            disabled={isSubmitting || isDraftSaving}
                         >
-                            <Send className="h-4 w-4" />
+                            {isDraftSaving ? "Saving..." : "Save Draft"}
+                        </Button>
+
+                        <Button
+                            type="submit" // Triggers Zod validation
+                            disabled={isSubmitting}
+                            className="bg-purple-700 hover:bg-purple-800"
+                        >
                             {isSubmitting ? "Publishing..." : "Publish Test"}
                         </Button>
-                        {/* <Button type="submit" disabled={isSubmitting} className="bg-purple-700 hover:bg-purple-800 gap-2">
-                            <Send className="h-4 w-4" /> {isSubmitting ? "Publishing..." : "Publish Test"}
-                        </Button> */}
                     </div>
                 </div>
 
@@ -265,6 +344,7 @@ export function TestBuilderShell() {
                     {/* CENTER PANEL: CONTENT */}
                     <main className="lg:col-span-6 space-y-12">
                         {sectionFields.map((section, sIndex) => (
+
                             <div key={section.id} className="space-y-6 border-l-2 border-purple-200 pl-4 ml-2">
                                 <Card className="bg-purple-50/50 border-none p-6 shadow-none">
 
@@ -320,11 +400,42 @@ export function TestBuilderShell() {
                                 </div>
                                 <div className="pt-3 border-t">
                                     <FieldLabel className="text-[10px]">Jump to Question</FieldLabel>
+                                    {/* In TestBuilderShell Sidebar */}
+                                    {/* Find this section in your Sidebar aside area */}
                                     <div className="grid grid-cols-5 gap-1 mt-2">
-                                        {allQuestions.map((_, i) => (
-                                            <div key={i} className="h-7 flex items-center justify-center bg-slate-100 rounded text-[10px] font-bold hover:bg-purple-700 hover:text-white cursor-pointer transition-colors">
-                                                {i + 1}
-                                            </div>
+                                        {watchedSections.map((section, sIdx) => (
+                                            (section.questions || []).map((q, qIdx) => {
+                                                // 1. This calculates the global number (1, 2, 3...) across all sections
+                                                const previousQuestionsCount = watchedSections
+                                                    .slice(0, sIdx)
+                                                    .reduce((acc, curr) => acc + (curr.questions?.length || 0), 0);
+                                                const displayIndex = previousQuestionsCount + qIdx + 1;
+
+                                                return (
+                                                    <div
+                                                        key={q.id || `nav-${sIdx}-${qIdx}`} // Stable key
+                                                        onClick={() => {
+                                                            // 2. Select all question cards currently on the screen
+                                                            const allCards = document.querySelectorAll('[id^="question-"]');
+                                                            // 3. Find the one matching our current number
+                                                            const targetCard = allCards[displayIndex - 1];
+
+                                                            if (targetCard) {
+                                                                targetCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                                                                setActiveId(q.id);
+                                                            } else {
+                                                                console.error("Could not find card at index:", displayIndex - 1);
+                                                            }
+                                                        }}
+                                                        className={cn(
+                                                            "h-7 flex items-center justify-center bg-slate-100 rounded text-[10px] font-bold hover:bg-purple-700 hover:text-white cursor-pointer transition-colors",
+                                                            activeId === q.id && "bg-purple-700 text-white"
+                                                        )}
+                                                    >
+                                                        {displayIndex}
+                                                    </div>
+                                                );
+                                            })
                                         ))}
                                     </div>
                                 </div>
@@ -346,17 +457,24 @@ function QuestionList({ sectionIndex, control, register, errors, setValue, watch
     return (
         <div className="space-y-6">
             {fields.map((field, qIndex) => (
-                <QuestionCard
+                /* This ID must start with "question-" for the querySelectorAll to work */
+                <div
                     key={field.id}
-                    control={control}
-                    register={register}
-                    errors={errors}
-                    watch={watch}
-                    setValue={setValue}
-                    sectionIndex={sectionIndex}
-                    index={qIndex}
-                    remove={() => remove(qIndex)}
-                />
+                    id={`question-${field.id}`}
+                    className="scroll-mt-28" // Important for sticky headers
+                >
+                    <QuestionCard
+                        id={field.id}
+                        control={control}
+                        register={register}
+                        errors={errors}
+                        watch={watch}
+                        setValue={setValue}
+                        sectionIndex={sectionIndex}
+                        index={qIndex}
+                        remove={() => remove(qIndex)}
+                    />
+                </div>
             ))}
             <Button
                 type="button"

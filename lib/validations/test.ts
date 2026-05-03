@@ -3,9 +3,9 @@ import * as z from "zod"
 // 1. Individual Option Schema
 const OptionSchema = z.object({
     id: z.string(),
-    text: z.string().min(1, "Option text cannot be empty"),
-    // is_correct: z.boolean().default(false), // The new flag
-    // is_correct: z.preprocess((val) => !!val, z.boolean())
+    // Remove .min(1) here so it doesn't block the form 
+    // when the question type is switched or while the teacher is typing.
+    text: z.string().default(""), 
     is_correct: z.coerce.boolean().default(false)
 })
 
@@ -14,14 +14,12 @@ const QuestionSchema = z.object({
     id: z.string(),
     type: z.enum(["multiple_choice", "short_answer"]),
     contentType: z.enum(["text", "image"]),
+     
+    imageUrl: z.string().url().optional().or(z.literal("")),
     tier: z.enum(["core", "extended"]),
     text: z.string().min(1, "Question content is required"),
-    options: z.array(z.object({
-        id: z.string(),
-        text: z.string().min(1, "Option text required"),
-        // is_correct: z.boolean()
-        is_correct: z.coerce.boolean().default(false)
-    })).optional(),
+    options: z.array(OptionSchema).optional().default([]),
+  
     correctOptionIds: z.array(z.string()).optional(),
     // correctOptionIds: z.array(z.string()).min(1, "Select at least one correct answer"),
     correctAnswerText: z.string().optional(),
@@ -36,19 +34,34 @@ const QuestionSchema = z.object({
         const options = data.options ?? [];
 
         // Check if there are any options at all
-        if (options.length === 0) {
+        if (options.length < 2) {
             ctx.addIssue({
                 code: z.ZodIssueCode.custom,
-                message: "Add at least one choice",
+                message: "Add at least two choices",
                 path: ["options"],
             });
         }
+        // 2. Check for Duplicates
+        const texts = options
+            .map(o => o.text.trim().toLowerCase())
+            .filter(t => t !== "");
+        const hasDuplicates = new Set(texts).size !== texts.length;
+
+        if (hasDuplicates) {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message: "Each choice must be unique",
+                path: ["options"] // This will show at the bottom of the options list
+            });
+        }
         // If options exist, ensure at least one is checked
-        else if (!options.some(opt => opt.is_correct)) {
+        // 3. At least one correct
+        const hasCorrect = options.some(o => o.is_correct);
+        if (!hasCorrect) {
             ctx.addIssue({
                 code: z.ZodIssueCode.custom,
                 message: "Select at least one correct answer",
-                path: ["options"],
+                path: ["options"]
             });
         }
     }

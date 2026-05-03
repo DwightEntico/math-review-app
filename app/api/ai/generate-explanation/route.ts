@@ -5,46 +5,61 @@ import { NextResponse } from "next/server";
 const apiKey = process.env.GEMINI_API_KEY || "";
 const genAI = new GoogleGenerativeAI(apiKey);
 
+// ✅ Add a helper to make sure the fetch actually works
+async function getBase64Image(url: string) {
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(`Failed to fetch image from storage: ${response.statusText}`);
+    const arrayBuffer = await response.arrayBuffer();
+    return Buffer.from(arrayBuffer).toString("base64");
+}
+
 export async function POST(req: Request) {
     try {
-        if (!apiKey) {
-            console.error("❌ MISSING GEMINI_API_KEY in environment variables");
-            return NextResponse.json({ error: "AI configuration missing" }, { status: 500 });
+        const { text, imageUrl, options, type } = await req.json();
+
+        // Ensure API Key exists
+        if (!process.env.GEMINI_API_KEY) {
+            return NextResponse.json({ error: "API Key missing" }, { status: 500 });
         }
 
-        const body = await req.json();
-        const { text, options, type } = body;
-
-        // Try adding '-latest'
         const model = genAI.getGenerativeModel({ model: "gemini-3.1-flash-lite-preview" });
-        // const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-latest" });
 
-        // Find the correct answer text to help the AI explain the right path
-        const correctAnswer = options?.find((o: any) => o.is_correct)?.text || "the provided solution";
+        const parts: any[] = [
+            {
+                text: `Explain this IGCSE question solution step-by-step. Text: ${text}. 
+               Options: ${options?.map((o: any) => o.text).join(", ")}. 
+               Use LaTeX for math.` }
+        ];
 
-        const prompt = `
-                    Context: IGCSE/A-Level Math & Science.
-                    Question: ${text}
-                    Correct Answer: ${correctAnswer}
-                    
-                    Task: Write a "Socratic" explanation. 
-                    1. Start with a 1-sentence "Concept" summary.
-                    2. Use a numbered list for steps.
-                    3. Use bolding for key terms.
-                    4. Use $$...$$ for standalone equations and $...$ for inline math.
-                    5. Tone: Encouraging mentor.
-                    `;
+        // ✅ Only try to process the image if imageUrl is a valid string
+        if (imageUrl && imageUrl.startsWith('http')) {
+            try {
+                const base64Data = await getBase64Image(imageUrl);
+                parts.push({
+                    inlineData: {
+                        data: base64Data,
+                        mimeType: "image/png", // Adjust if needed
+                    },
+                });
+            } catch (imgErr) {
+                console.error("Image Fetch Error:", imgErr);
+                // We continue with just text if the image fetch fails
+            }
+        }
 
-        const result = await model.generateContent(prompt);
+        const result = await model.generateContent({
+            contents: [{ role: "user", parts }],
+        });
+
         const response = await result.response;
-        const explanation = response.text();
+        const output = response.text();
 
-        return NextResponse.json({ explanation });
+        return NextResponse.json({ explanation: output });
+
     } catch (error: any) {
-        // This will show up in your terminal where the Next.js server is running
-        console.error("❌ AI ROUTE ERROR:", error.message || error);
+        console.error("AI ROUTE ERROR:", error);
         return NextResponse.json({
-            error: "Failed to generate explanation",
+            error: "Generation failed",
             details: error.message
         }, { status: 500 });
     }
