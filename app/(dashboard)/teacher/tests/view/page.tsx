@@ -156,7 +156,7 @@ export default function TestBankPage() {
                     <p className="text-muted-foreground">Manage your curriculum-aligned exam papers and question pools.</p>
                 </div>
                 <Button
-                    onClick={() => router.push("/dashboard/tests/create")}
+                    onClick={() => router.push("/teacher/tests/new")}
                     className="bg-purple-700 hover:bg-purple-800 text-white font-bold"
                 >
                     + Create New Test
