@@ -70,7 +70,7 @@ export async function proxy(request: NextRequest) {
 
   // Teacher Protection
   if (userRole === 'teacher' && (isAccessingStudent || isAccessingAdmin)) {
-    return NextResponse.redirect(new URL('/teacher/dashboard', request.url))
+    return NextResponse.redirect(new URL('/(dashboard)/teacher/dashboard', request.url))
   }
 
   // Admin Protection

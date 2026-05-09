@@ -43,6 +43,8 @@ export function TestBuilderShell() {
                         type: 'multiple_choice',
                         contentType: 'text',
                         tier: 'core',
+                        mathLevelId: '',
+                        mathPaperId: '',
                         text: '',
                         options: [
                             { id: crypto.randomUUID(), text: '', is_correct: false },
@@ -51,7 +53,7 @@ export function TestBuilderShell() {
                         correctOptionIds: [],
                         correctAnswerText: '',
                         points: 1,
-                        isCalculator: false,
+                        hasCalculator: false,
                         aiExplanation: '',
                         aiTutorPrompt: '',
                         imageUrl: ''
@@ -275,6 +277,19 @@ export function TestBuilderShell() {
                                 )}
                             </ul>
 
+                            {/* <div className="flex gap-4">
+                                {questionErrors?.topicId && (
+                                    <p className="text-[9px] text-red-500 font-bold uppercase italic">
+                                        Topic required
+                                    </p>
+                                )}
+                                {questionErrors?.subtopicId && (
+                                    <p className="text-[9px] text-red-500 font-bold uppercase italic">
+                                        Subtopic required
+                                    </p>
+                                )}
+                            </div> */}
+
                         </div>
                     </div>
                 )}
@@ -348,7 +363,7 @@ export function TestBuilderShell() {
                             <div key={section.id} className="space-y-6 border-l-2 border-purple-200 pl-4 ml-2">
                                 <Card className="bg-purple-50/50 border-none p-6 shadow-none">
 
-                                    <div className="flex items-center justify-between mb-2">
+                                    <div className="flex items-center justify-between">
                                         <input
                                             {...register(`sections.${sIndex}.title`)}
                                             className="text-lg font-bold bg-transparent border-none focus:outline-none focus:ring-0 p-0 w-full"
@@ -361,7 +376,7 @@ export function TestBuilderShell() {
                                     <Textarea
                                         {...register(`sections.${sIndex}.description`)}
                                         placeholder="Section instructions..."
-                                        className="bg-transparent  text-sm resize-none focus:ring-0 shadow-none  min-h-[40px]"
+                                        className="bg-transparent  text-sm resize-none focus:ring-0 shadow-none  min-h-[35px]"
                                     />
                                 </Card>
 

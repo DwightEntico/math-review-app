@@ -11,7 +11,7 @@ export default function TeacherLayout({ children }: { children: React.ReactNode 
         <main className="flex-1">
           <header className="flex h-16 items-center border-b px-4 gap-4 bg-white">
             <SidebarTrigger />
-            <h1 className="font-semibold">Instructor Portal</h1>
+            <h1 className="font-semibold">Facilitator Portal</h1>
           </header>
           <div className="p-6">{children}</div>
         </main>

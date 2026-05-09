@@ -52,6 +52,7 @@ const data = {
       icon: BookOpen,
       items: [
         { title: "Create New Test", url: "/teacher/tests/new" },
+        { title: "View Test Banks", url: "/teacher/tests/view" },
         { title: "Browse Questions", url: "/teacher/bank" },
 
         { title: "Create Question", url: "/teacher/bank/new" }, // Logic for the Schema we built

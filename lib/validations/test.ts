@@ -5,7 +5,7 @@ const OptionSchema = z.object({
     id: z.string(),
     // Remove .min(1) here so it doesn't block the form 
     // when the question type is switched or while the teacher is typing.
-    text: z.string().default(""), 
+    text: z.string().default(""),
     is_correct: z.coerce.boolean().default(false)
 })
 
@@ -14,17 +14,22 @@ const QuestionSchema = z.object({
     id: z.string(),
     type: z.enum(["multiple_choice", "short_answer"]),
     contentType: z.enum(["text", "image"]),
-     
+
+    mathLevelId: z.string().min(1, "Math level is required"),
+    mathPaperId: z.string().min(1,"Math Paper is required"),
+    topicId: z.string().min(1, "Topic is required"),
+    subtopicId: z.string().optional(),
+
     imageUrl: z.string().url().optional().or(z.literal("")),
     tier: z.enum(["core", "extended"]),
     text: z.string().min(1, "Question content is required"),
     options: z.array(OptionSchema).optional().default([]),
-  
+
     correctOptionIds: z.array(z.string()).optional(),
     // correctOptionIds: z.array(z.string()).min(1, "Select at least one correct answer"),
     correctAnswerText: z.string().optional(),
     points: z.number().min(1, "Minimum 1 point"),
-    isCalculator: z.boolean().default(false).optional(),
+    hasCalculator: z.boolean().default(false).optional(),
     // aiExplanation: z.string().optional(),
     aiExplanation: z.string().optional(), // Stores the 'perfect' explanation
     aiTutorPrompt: z.string().optional(),

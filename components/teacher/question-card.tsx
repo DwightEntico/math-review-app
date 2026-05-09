@@ -1,6 +1,6 @@
 'use client'
 import { createClient } from '@/lib/supabase/client'
-import React from 'react'
+import React, { useState } from 'react'
 import { useFieldArray, useWatch } from "react-hook-form"
 import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -37,6 +37,9 @@ import ReactMarkdown from 'react-markdown'
 import remarkMath from 'remark-math'
 import rehypeKatex from 'rehype-katex'
 import 'katex/dist/katex.min.css' // Import the CSS for math symbols
+import { ReusableDropdown } from '../dropdown'
+import { boolean } from 'zod'
+import { Spinner } from '../ui/spinner'
 /**
  * SUB-COMPONENT: Individual Option Item
  * Prevents Rules of Hooks errors by calling useWatch at the top level of its own component.
@@ -115,16 +118,21 @@ export function QuestionCard({
     // 2. ALL HOOKS AT THE TOP LEVEL
     // Do not call these inside functions or conditionals
     const questionText = useWatch({ control, name: `${basePath}.text` })
+    const hasQuestionContent = questionText?.trim().length > 0;
     const currentOptions = useWatch({ control, name: `${basePath}.options` }) || []
     const questionType = useWatch({ control, name: `${basePath}.type` })
     const contentType = useWatch({ control, name: `${basePath}.contentType` })
-    const isCalculator = useWatch({ control, name: `${basePath}.isCalculator` })
+    const hasCalculator = useWatch({ control, name: `${basePath}.hasCalculator` })
     const aiExplanation = useWatch({ control, name: `${basePath}.aiExplanation` });
     const imageUrl = useWatch({ control, name: `${basePath}.imageUrl` });
     const [activeId, setActiveId] = React.useState<string | null>(null);
     const [isGenerating, setIsGenerating] = React.useState(false);
+    const [selectedTopicId, setSelectedTopicId] = useState("")
+    const [mathLevels, setMathLevels] = React.useState<{ id: string, name: string }[]>([]);
+    const [papers, setPapers] = React.useState<{ id: string, name: string, has_calculator: boolean }[]>([]);
+    const [topics, setTopics] = React.useState<{ id: string, name: string, math_level_id: string, math_paper_id: string }[]>([]);
+    const [subtopics, setSubtopics] = React.useState<{ id: string, name: string, math_level_id: string, math_paper_id: string, math_topic_id: string, }[]>([]);
 
-    // Options Field Array
     const { fields: optionFields, append: appendOption, remove: removeOption } = useFieldArray({
         control,
         name: `${basePath}.options`
@@ -137,9 +145,10 @@ export function QuestionCard({
         if (url.endsWith(".webp")) return "image/webp";
         return "image/png"; // Default
     };
-    // 3. LOGIC FUNCTIONS
+
+
     const generateAIExplanation = async () => {
-        // Only block if BOTH are missing
+
         if (contentType === 'text' && !questionText) {
             toast.error("Please enter the question text first");
             return;
@@ -259,6 +268,121 @@ export function QuestionCard({
             setValue(`${basePath}.imageUrl`, "");
         }
     };
+
+    // math levels
+    React.useEffect(() => {
+        const fetchLevels = async () => {
+            try {
+                const res = await fetch('/api/math-levels/view/');
+                const data = await res.json();
+                if (Array.isArray(data)) setMathLevels(data);
+            } catch (err) {
+                console.error("Failed to load math levels", err);
+            }
+        };
+        fetchLevels();
+    }, []);
+
+    const selectedMathLevelId = useWatch({
+        control,
+        name: `${basePath}.mathLevelId`,
+        defaultValue: "" // Set a default to match your Select defaultValue
+    });
+
+    // papers
+    React.useEffect(() => {
+        if (!selectedMathLevelId) {
+            setPapers([]);
+            return;
+        }
+
+        const fetchPapers = async () => {
+            const res = await fetch(`/api/math-papers/view?mathLevelId=${selectedMathLevelId}`);
+            const data = await res.json();
+            if (Array.isArray(data)) setPapers(data as any);
+        };
+
+        fetchPapers();
+    }, [selectedMathLevelId]);
+
+    // 1. Watch the selected paper
+    // const selectedPaperId = useWatch({
+    //     control,
+    //     name: `${basePath}.mathPaperId`,
+    // });
+    const selectedMathPaperId = useWatch({
+        control,
+        name: `${basePath}.mathPaperId`,
+        defaultValue: "" // Set a default to match your Select defaultValue
+    });
+
+    // 2. Derive the state (This runs every re-render)
+    const selectedMathPaperHasCalculator = React.useMemo(() => {
+        return papers.find(p => p.id === selectedMathPaperId)?.has_calculator ?? false;
+    }, [selectedMathPaperId, papers]);
+
+    // 3. Auto-update the question's calculator setting (Optional but helpful)
+    React.useEffect(() => {
+        if (selectedMathPaperHasCalculator !== undefined) {
+            setValue(`${basePath}.hasCalculator`, selectedMathPaperHasCalculator);
+        }
+    }, [selectedMathPaperHasCalculator, setValue, basePath]);
+
+
+    // 2. Fetch topics whenever Level or Paper changes
+    React.useEffect(() => {
+        // Clear subtopics if we lose the Level
+        if (!selectedMathLevelId) {
+            setTopics([]);
+            return;
+        }
+
+        const fetchTopics = async () => {
+            // We prioritize filtering by Paper, fallback to Level
+            // const url = selectedMathPaperId
+            //     ? `/api/math-topics/view?paperId=${selectedMathPaperId}`
+            //     : `/api/math-topics/view?mathLevelId=${selectedMathLevelId}`;
+
+            const res = await fetch(`/api/math-topics/view?mathLevelId=${selectedMathLevelId}&mathPaperId=${selectedMathPaperId}`);
+            const data = await res.json();
+            if (Array.isArray(data)) setTopics(data as any);
+        };
+
+        fetchTopics();
+    }, [selectedMathLevelId, selectedMathPaperId]);
+
+    const selectedMathTopicslId = useWatch({
+        control,
+        name: `${basePath}.topicId`,
+        defaultValue: "" // Set a default to match your Select defaultValue
+    });
+
+    // subtopics
+    React.useEffect(() => {
+        // Clear subtopics if we lose the Level
+        if (!selectedMathTopicslId) {
+            setSubtopics([]);
+            return;
+        }
+
+        const fetchSubtopics = async () => {
+
+            const res = await fetch(`/api/math-subtopics/view?mathLevelId=${selectedMathLevelId}&mathPaperId=${selectedMathPaperId}&mathTopicId=${selectedMathTopicslId}`);
+            const data = await res.json();
+            if (Array.isArray(data)) setSubtopics(data as any);
+        };
+
+        fetchSubtopics();
+    }, [selectedMathLevelId, selectedMathPaperId, selectedMathTopicslId]);
+
+    const selectedMathSubTopicslId = useWatch({
+        control,
+        name: `${basePath}.subtopicId`,
+        defaultValue: "" // Set a default to match your Select defaultValue
+    });
+
+
+
     return (
         <Card
             onClick={() => setActiveId(id)} // ✅ Set active when user clicks anywhere on card
@@ -273,35 +397,82 @@ export function QuestionCard({
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2 text-muted-foreground">
                         <GripVertical className="h-4 w-4 cursor-grab" />
-                        <span className="text-xs font-bold uppercase tracking-wider">Question {index + 1}</span>
+                        <span className="text-xs font-bold uppercase tracking-wider">Question {index + 1} </span>
+                        {/* <p>MST {selectedMathSubTopicslId}</p> */}
+                        {/* <p>MP {selectedMathPaperId}</p>
+                        <p>MT {selectedMathTopicslId}</p> */}
                     </div>
+                    <Tabs
+                        value={contentType}
+                        onValueChange={(v) => setValue(`${basePath}.contentType`, v)}
+                        className="shrink-0"
+                    >
+                        <TabsList className="h-8 bg-slate-100/50">
+                            <TabsTrigger value="text" className="text-[10px] uppercase font-bold px-3 h-6 data-[state=active]:bg-white shadow-none">
+                                <Type className="h-3 w-3" />
+                            </TabsTrigger>
+                            <TabsTrigger value="image" className="text-[10px] uppercase font-bold px-3 h-6 data-[state=active]:bg-white shadow-none">
+                                <ImageIcon className="h-3 w-3" />
+                            </TabsTrigger>
+                        </TabsList>
+                    </Tabs>
 
-                    <div className="flex items-center gap-3">
-                        <Select
-                            defaultValue="core"
-                            onValueChange={(v) => setValue(`${basePath}.tier`, v)}
-                        >
-                            <SelectTrigger className="w-[110px] h-8 text-[10px] font-bold border-purple-200 text-purple-700 uppercase">
-                                <SelectValue placeholder="TIER" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="core">CORE</SelectItem>
-                                <SelectItem value="extended">EXTENDED</SelectItem>
-                            </SelectContent>
-                        </Select>
+                </div>
 
-                        <Tabs value={contentType} onValueChange={(v) => setValue(`${basePath}.contentType`, v)}>
-                            {/* {contentType} */}
-                            <TabsList className="h-8">
-                                <TabsTrigger value="text" className="text-[10px] uppercase font-bold px-3">
-                                    <Type className="h-3 w-3 mr-1" />
-                                </TabsTrigger>
-                                <TabsTrigger value="image" className="text-[10px] uppercase font-bold px-3">
-                                    <ImageIcon className="h-3 w-3 mr-1" />
-                                </TabsTrigger>
-                            </TabsList>
-                        </Tabs>
-                    </div>
+                <div className="grid grid-cols-2 gap-2 w-full ml-auto">
+                    {/* MATH LEVEL */}
+                    <ReusableDropdown
+                        data={mathLevels}
+                        value={selectedMathLevelId}
+                        placeholder="LEVEL"
+                        className="w-full border-purple-200 bg-purple-50 text-purple-700"
+                        disabled={mathLevels.length === 0}
+                        onChange={(val) => {
+                            setValue(`${basePath}.mathLevelId`, val);
+                            setValue(`${basePath}.mathPaperId`, "");
+                            setValue(`${basePath}.topicId`, "");
+                            setValue(`${basePath}.subtopicId`, "");
+                        }}
+                    />
+
+                    {/* MATH PAPER */}
+                    <ReusableDropdown
+                        data={papers}
+                        value={selectedMathPaperId}
+                        placeholder="PAPER"
+                        className="w-full"
+                        disabled={!selectedMathLevelId || papers.length === 0}
+                        onChange={(val) => {
+                            setValue(`${basePath}.mathPaperId`, val);
+                            setValue(`${basePath}.topicId`, "");
+                            setValue(`${basePath}.subtopicId`, "");
+                        }}
+                    />
+
+                    {/* MATH TOPIC */}
+                    <ReusableDropdown
+                        data={topics}
+                        value={selectedMathTopicslId}
+                        placeholder="TOPIC"
+                        className="w-full"
+                        disabled={!selectedMathLevelId || !selectedMathPaperId || topics.length === 0}
+                        onChange={(val) => {
+                            setValue(`${basePath}.topicId`, val);
+                            setValue(`${basePath}.subtopicId`, "");
+                        }}
+                    />
+
+                    {/* MATH SUBTOPIC */}
+                    <ReusableDropdown
+                        data={subtopics}
+                        value={selectedMathSubTopicslId}
+                        placeholder="SUBTOPIC"
+                        className="w-full"
+                        disabled={!selectedMathLevelId || !selectedMathPaperId || !selectedMathTopicslId || subtopics.length === 0}
+                        onChange={(val) => {
+                            setValue(`${basePath}.subtopicId`, val);
+                        }}
+                    />
                 </div>
 
                 {/* Problem Description */}
@@ -484,29 +655,52 @@ export function QuestionCard({
 
                 {/* FOOTER TOOLBAR */}
                 <div className="pt-5 border-t flex items-center justify-between">
+
                     <Button
                         type="button"
                         variant="ghost"
                         size="sm"
-                        disabled={isGenerating}
+                        // disabled={isGenerating}
+                        disabled={isGenerating || !hasQuestionContent}
                         onClick={generateAIExplanation}
                         className="text-purple-700 bg-purple-50 hover:bg-purple-100 gap-2 h-9 px-4 text-[11px] font-bold uppercase tracking-widest transition-all"
                     >
-                        <Sparkles className={cn("h-4 w-4", isGenerating && "animate-spin")} />
-                        {isGenerating ? "Generating..." : "AI Explanation"}
+                        {/* <Sparkles className={cn("h-4 w-4", isGenerating && "animate-spin")} /> */}
+                        {isGenerating ? (
+                            <Spinner className="h-4 w-4 animate-spin" />
+                        ) : (
+                            <Sparkles className="h-4 w-4 transition-transform group-hover:rotate-12" />
+                        )}
+                        {isGenerating ? "Generating..." : !hasQuestionContent ? "Enter Question Text to use AI" : "AI Explanation"}
                     </Button>
 
                     <div className="flex items-center gap-4">
-                        <div className="flex items-center gap-2 bg-slate-50 px-3 py-1.5 rounded-full border border-slate-100 h-9">
-                            <Calculator className={cn("h-4 w-4 transition-colors", isCalculator ? "text-purple-700" : "text-slate-300")} />
-                            <span className="text-[10px] font-bold uppercase text-slate-500">Calc</span>
-                            <Switch
-                                checked={isCalculator ?? false}
-                                onCheckedChange={(checked) => setValue(`${basePath}.isCalculator`, checked)}
-                                className="scale-75 data-[state=checked]:bg-purple-700"
-                            />
-                        </div>
+                        <div className={cn(
+                            "flex items-center gap-2 px-3 py-1.5 rounded-full border transition-all duration-300 h-9",
+                            hasCalculator
+                                ? "bg-purple-50 border-purple-200 text-purple-700 shadow-sm"
+                                : "bg-slate-50 border-slate-100 text-slate-400"
+                        )}>
+                            <Calculator className={cn(
+                                "h-4 w-4 transition-transform duration-500",
+                                hasCalculator ? "scale-110" : "scale-100 opacity-50"
+                            )} />
 
+                            <div className="flex flex-col leading-none">
+                                <span className="text-[9px] font-black uppercase tracking-wider">
+                                    Calculator
+                                </span>
+                                <span className="text-[8px] font-medium uppercase opacity-70">
+                                    {hasCalculator ? "Required" : "Prohibited"}
+                                </span>
+                            </div>
+
+                            {/* Visual Dot Indicator instead of a Switch */}
+                            <div className={cn(
+                                "h-1.5 w-1.5 rounded-full ml-1 animate-pulse",
+                                hasCalculator ? "bg-purple-500" : "bg-slate-300"
+                            )} />
+                        </div>
                         <div className="flex items-center gap-2">
                             <Input
                                 type="number"
@@ -578,7 +772,7 @@ export function QuestionCard({
                     </div>
                 )}
             </div>
-        </Card>
+        </Card >
     )
 }
 
