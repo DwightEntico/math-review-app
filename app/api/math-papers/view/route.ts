@@ -16,6 +16,7 @@ export async function GET(request: Request) {
         .from('math_papers')
         .select('id, name, has_calculator, level_id')
         .eq('level_id', mathLevelId) // Filter by the ID
+        .eq('status','active')
         .order('name', { ascending: false })
 
     if (error) {

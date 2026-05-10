@@ -39,12 +39,14 @@ import {
   TooltipProvider,
   TooltipTrigger
 } from "@/components/ui/tooltip"
+import { toast } from "sonner"
 interface DataTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[]
   data: TData[]
   searchKey: string
   title: string
   onRefresh?: () => Promise<void> // New prop: must be an async function
+  loading?: boolean
 }
 
 export function DataTable<TData, TValue>({
@@ -53,6 +55,7 @@ export function DataTable<TData, TValue>({
   searchKey,
   title,
   onRefresh,
+  loading
 }: DataTableProps<TData, TValue>) {
   const [sorting, setSorting] = React.useState<SortingState>([])
   const [globalFilter, setGlobalFilter] = React.useState("")
@@ -79,15 +82,92 @@ export function DataTable<TData, TValue>({
     await onRefresh()
     // Small timeout so the spin is visible to the user even if the API is instant
     setTimeout(() => setIsRefreshing(false), 500)
+    toast.success("Table has been refreshed!")
   }
+  // const exportToExcel = () => {
+  //   // 1. Get filtered rows
+  //   const filteredRows = table.getFilteredRowModel().rows;
 
+  //   const exportData = filteredRows.map((row) => {
+  //     const rowData: any = {};
+
+  //     row.getVisibleCells().forEach((cell) => {
+  //       const columnId = cell.column.id;
+
+  //       // 2. Skip 'actions' and 'select' columns (common in DataTables)
+  //       if (columnId !== "actions" && columnId !== "select") {
+
+  //         // 3. Handle Header Aliasing
+  //         // If header is a function (like for sorting), use the column ID or a custom title
+  //         let headerLabel = cell.column.columnDef.header;
+  //         if (typeof headerLabel !== "string") {
+  //           // Fallback to column ID (e.g., "level_name") and capitalize it
+  //           headerLabel = columnId.split('_').join(' ').toUpperCase();
+  //         }
+
+  //         // 4. Get the Value
+  //         let value = cell.getValue();
+
+  //         // 5. Value Cleaning (Optional but recommended)
+  //         if (typeof value === "boolean") value = value ? "Yes" : "No";
+  //         if (value === null || value === undefined) value = "";
+
+  //         rowData[headerLabel as string] = value;
+  //       }
+  //     });
+  //     return rowData;
+  //   });
+
+  //   // 6. Generate Excel
+  //   const worksheet = XLSX.utils.json_to_sheet(exportData);
+  //   const workbook = XLSX.utils.book_new();
+  //   XLSX.utils.book_append_sheet(workbook, worksheet, "Sheet1");
+
+  //   // Use the title prop or default to 'Export'
+  //   XLSX.writeFile(workbook, `${title || 'Table'}-Export.xlsx`);
+  // }; 
   const exportToExcel = () => {
-    const worksheet = XLSX.utils.json_to_sheet(data as any)
-    const workbook = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Data")
-    XLSX.writeFile(workbook, `${title}-export.xlsx`)
-  }
+    // 1. Get filtered rows
+    const filteredRows = table.getFilteredRowModel().rows;
 
+    const exportData = filteredRows.map((row) => {
+      const rowData: any = {};
+
+      row.getVisibleCells().forEach((cell) => {
+        const columnId = cell.column.id;
+
+        // 2. Skip 'actions' and 'select' columns (common in DataTables)
+        if (columnId !== "actions" && columnId !== "select") {
+
+          // 3. Handle Header Aliasing
+          // If header is a function (like for sorting), use the column ID or a custom title
+          let headerLabel = cell.column.columnDef.header;
+          if (typeof headerLabel !== "string") {
+            // Fallback to column ID (e.g., "level_name") and capitalize it
+            headerLabel = columnId.split('_').join(' ').toUpperCase();
+          }
+
+          // 4. Get the Value
+          let value = cell.getValue();
+
+          // 5. Value Cleaning (Optional but recommended)
+          if (typeof value === "boolean") value = value ? "Yes" : "No";
+          if (value === null || value === undefined) value = "";
+
+          rowData[headerLabel as string] = value;
+        }
+      });
+      return rowData;
+    });
+
+    // 6. Generate Excel
+    const worksheet = XLSX.utils.json_to_sheet(exportData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Sheet1");
+
+    // Use the title prop or default to 'Export'
+    XLSX.writeFile(workbook, `${title || 'Table'}-Export.xlsx`);
+  };
   return (
     <div className="space-y-4 w-full">
       {/* Header Actions */}

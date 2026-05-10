@@ -6,6 +6,7 @@ import {
   BarChart3,
   BookOpen,
   Bot,
+  Cog,
   Command,
   Frame,
   GalleryVerticalEnd,
@@ -77,27 +78,49 @@ const data = {
       ],
     },
     {
-      title: "Curriculum Editor",
-      url: "/admin/curriculum",
-      icon: BookOpen,
+      title: "Settings",
+      url: "/admin/settings",
+      icon: Cog,
       items: [
         {
-          title: "Global Topic Bank",
-          url: "/admin/curriculum/topics",
-          description: "Manage the master list of all IGCSE math topics"
+          title: "Paper",
+          url: "/admin/settings/paper",
+          description: "Manage the master list of all IGCSE math papers"
         },
         {
-          title: "Paper Mapping",
-          url: "/admin/curriculum/mapping",
+          title: "Topics",
+          url: "/admin/settings/topics",
           description: "Assign topics to Core/Extended Papers"
         },
         {
-          title: "AI Logic Config",
-          url: "/admin/curriculum/ai-config",
-          description: "Manage specific AI model types and prompts"
+          title: "Subtopics",
+          url: "/admin/settings/subtopics",
+          description: "Manage specific subtopics"
         },
       ],
     },
+    // {
+    //   title: "Curriculum Editor",
+    //   url: "/admin/curriculum",
+    //   icon: BookOpen,
+    //   items: [
+    //     {
+    //       title: "Global Topic Bank",
+    //       url: "/admin/curriculum/topics",
+    //       description: "Manage the master list of all IGCSE math topics"
+    //     },
+    //     {
+    //       title: "Paper Mapping",
+    //       url: "/admin/curriculum/mapping",
+    //       description: "Assign topics to Core/Extended Papers"
+    //     },
+    //     {
+    //       title: "AI Logic Config",
+    //       url: "/admin/curriculum/ai-config",
+    //       description: "Manage specific AI model types and prompts"
+    //     },
+    //   ],
+    // },
     {
       title: "User Management",
       url: "/admin/users",
